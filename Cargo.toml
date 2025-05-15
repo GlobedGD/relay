@@ -1,0 +1,8 @@
+[package]
+name = "globed-relay"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+globed-shared = { path = "/home/dankpc/programming/geode2/globed2/server/shared" }
+tokio = { version = "1.45.0", features = ["full"] }
