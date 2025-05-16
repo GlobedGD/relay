@@ -188,7 +188,6 @@ impl RelayClient {
                 .read(&mut buf)
                 .await
                 .inspect_err(|e| {
-                    #[cfg(debug_assertions)]
                     debug!("[{}] downstream tcp read error: {}", self.get_peer_addr(), e);
                 })
                 .map_err(RelayError::DownstreamSocketFail)?;
@@ -197,7 +196,6 @@ impl RelayClient {
                 return Err(RelayError::Closed);
             }
 
-            #[cfg(debug_assertions)]
             trace!("[{}] relaying {} tcp bytes UPstream", self.get_peer_addr(), n);
 
             self.upstream_write
@@ -225,7 +223,6 @@ impl RelayClient {
                 .read(&mut buf)
                 .await
                 .inspect_err(|e| {
-                    #[cfg(debug_assertions)]
                     debug!("[{}] upstream tcp read error: {}", self.get_peer_addr(), e);
                 })
                 .map_err(RelayError::UpstreamSocketFail)?;
@@ -234,7 +231,6 @@ impl RelayClient {
                 return Err(RelayError::Closed);
             }
 
-            #[cfg(debug_assertions)]
             trace!("[{}] relaying {} tcp bytes DOWNstream", self.get_peer_addr(), n);
 
             self.downstream_write
@@ -264,7 +260,6 @@ impl RelayClient {
                 continue;
             }
 
-            #[cfg(debug_assertions)]
             trace!("[{}] relaying {} udp bytes DOWNstream", self.get_peer_addr(), n);
 
             self.downstream_udp
@@ -282,7 +277,6 @@ impl RelayClient {
     }
 
     pub async fn push_new_udp_message(&self, message: &[u8]) -> Result<(), RelayError> {
-        #[cfg(debug_assertions)]
         trace!(
             "[{}] relaying {} udp bytes UPstream",
             self.get_peer_addr(),
