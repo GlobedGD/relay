@@ -1,8 +1,9 @@
 use std::net::SocketAddr;
 
-use globed_shared::{LogLevelFilter, Logger, get_log_level, info, log};
+use logger::{LogLevelFilter, Logger, get_log_level, info, log};
 use relay_server::RelayServer;
 
+mod logger;
 mod relay_client;
 mod relay_server;
 

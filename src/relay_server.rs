@@ -1,6 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
-use globed_shared::{SyncMutex, debug, error, info, warn};
+use crate::logger::{debug, error, info, warn};
+use parking_lot::Mutex as SyncMutex;
 use tokio::{
     net::{TcpListener, UdpSocket},
     sync::Notify,

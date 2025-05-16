@@ -7,4 +7,4 @@ COPY src src
 
 RUN cargo install --path .
 
-CMD ["globed-relay"]
+ENTRYPOINT ["globed-relay"]

@@ -1,6 +1,6 @@
 use std::{fmt::Display, net::SocketAddr, sync::Arc, time::Duration};
 
-use globed_shared::{debug, rand, trace, warn};
+use crate::logger::{debug, trace, warn};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{

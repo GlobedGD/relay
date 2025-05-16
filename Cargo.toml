@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-globed-shared = { path = "/home/dankpc/programming/geode2/globed2/server/shared" }
+colored = "3.0.0"
+log = "0.4.27"
+parking_lot = "0.12.3"
+rand = "0.9.1"
+time = { version = "0.3.41", features = ["formatting"] }
 tokio = { version = "1.45.0", features = ["full"] }
