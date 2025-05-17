@@ -68,6 +68,13 @@ impl RelayServer {
                                     match RelayClient::run_client(&client).await {
                                         Ok(()) => {}
 
+                                        Err(RelayError::Closed) => {
+                                            debug!(
+                                                "[{}] client terminated because the connection was closed",
+                                                client.get_peer_addr()
+                                            );
+                                        }
+
                                         Err(err) => {
                                             warn!(
                                                 "[{}] client terminated due to an error: {}",
