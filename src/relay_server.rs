@@ -218,12 +218,23 @@ impl RelayServer {
             client.set_udp_peer(None);
         }
 
-        client.establish_upstream_connection().await.inspect_err(|e| {
-            warn!(
-                "[{}] error during establishing upstream connection: {e}",
-                client.get_peer_addr()
-            );
-        })?;
+        match tokio::time::timeout(Duration::from_secs(10), client.establish_upstream_connection()).await {
+            Ok(Ok(())) => {}
+
+            Ok(Err(e)) => {
+                warn!(
+                    "[{}] error during establishing upstream connection: {e}",
+                    client.get_peer_addr()
+                );
+
+                return Err(e);
+            }
+
+            Err(_) => {
+                warn!("[{}] timed out connecting to upstream server", client.get_peer_addr());
+                return Err(RelayError::UpstreamConnTimeout);
+            }
+        }
 
         client.send_relay_established().await?;
 

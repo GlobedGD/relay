@@ -37,6 +37,7 @@ pub enum RelayError {
     UpstreamSocketFail(std::io::Error),
     DownstreamSocketFail(std::io::Error),
     NoUdp,
+    UpstreamConnTimeout,
 }
 
 impl From<std::io::Error> for RelayError {
@@ -57,6 +58,7 @@ impl Display for RelayError {
             Self::UpstreamSocketFail(e) => write!(f, "Upstream socket failure: {e}"),
             Self::DownstreamSocketFail(e) => write!(f, "Downstream socket failure: {e}"),
             Self::NoUdp => write!(f, "Cannot send/receive udp data because client enabled tcp-only mode"),
+            Self::UpstreamConnTimeout => write!(f, "Upstream connection timed out"),
         }
     }
 }
