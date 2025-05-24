@@ -11,6 +11,7 @@ use tokio::{
 };
 
 pub const RELAY_MAGIC: u32 = 0x7f8a9b0c;
+pub const RELAY_MAGIC_SKIP_LINK: u32 = 0x7f8a9b0d;
 
 pub struct RelayClient {
     downstream_write: Mutex<OwnedWriteHalf>,
@@ -35,6 +36,7 @@ pub enum RelayError {
     Closed,
     UpstreamSocketFail(std::io::Error),
     DownstreamSocketFail(std::io::Error),
+    NoUdp,
 }
 
 impl From<std::io::Error> for RelayError {
@@ -47,13 +49,14 @@ impl Display for RelayError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Socket(err) => write!(f, "Socket error: {err}"),
-            Self::InvalidMagic => write!(f, "Invalid magic sent by the client"),
+            Self::InvalidMagic => write!(f, "Invalid magic sent by the client for this part of the connection"),
             Self::InvalidHost => write!(f, "Invalid host was sent by the client"),
             Self::DisallowedHost => write!(f, "Disallowed host"),
             Self::InternalError => write!(f, "Internal error, check other logs for more information"),
             Self::Closed => write!(f, "One of the ends of the connection was closed"),
             Self::UpstreamSocketFail(e) => write!(f, "Upstream socket failure: {e}"),
             Self::DownstreamSocketFail(e) => write!(f, "Downstream socket failure: {e}"),
+            Self::NoUdp => write!(f, "Cannot send/receive udp data because client enabled tcp-only mode"),
         }
     }
 }
@@ -124,6 +127,18 @@ impl RelayClient {
         host.parse::<SocketAddr>().map_err(|_| RelayError::InvalidHost)
     }
 
+    pub async fn wait_for_skip_udp_link(&mut self) -> Result<(), RelayError> {
+        let mut socket = self.downstream_read.lock().await;
+
+        let rmagic = socket.read_u32().await?;
+
+        if rmagic != RELAY_MAGIC_SKIP_LINK {
+            return Err(RelayError::InvalidMagic);
+        }
+
+        Ok(())
+    }
+
     pub async fn send_udp_question(&mut self) -> Result<u32, RelayError> {
         let mut num = rand::random::<u32>();
 
@@ -163,7 +178,11 @@ impl RelayClient {
         trace!("[{}] connecting to upstream: {}", self.get_peer_addr(), target);
 
         let tcp = TcpStream::connect(target).await?;
-        let udp = UdpSocket::bind("0.0.0.0:0").await?;
+        let udp = if self.get_udp_peer().is_some() {
+            Some(UdpSocket::bind("0.0.0.0:0").await?)
+        } else {
+            None
+        };
 
         let (r, mut w) = tcp.into_split();
 
@@ -171,7 +190,7 @@ impl RelayClient {
 
         *self.upstream_read.lock().await = Some(r);
         *self.upstream_write.lock().await = Some(w);
-        self.upstream_udp = Some(udp);
+        self.upstream_udp = udp;
 
         Ok(())
     }
@@ -245,6 +264,10 @@ impl RelayClient {
     // udp
 
     async fn run_udp_recv_loop(&self) -> Result<(), RelayError> {
+        if self.upstream_udp.is_none() {
+            return Err(RelayError::NoUdp);
+        }
+
         let mut buf = [0u8; 65536];
 
         loop {
@@ -272,7 +295,7 @@ impl RelayClient {
         tokio::select! {
             r = cl.run_tcp_send_loop() => r,
             r = cl.run_tcp_recv_loop() => r,
-            r = cl.run_udp_recv_loop() => r,
+            r = cl.run_udp_recv_loop(), if cl.get_udp_peer().is_some() => r,
         }
     }
 

@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         servers.push(host.parse::<SocketAddr>().expect("Failed to parse address"));
     }
 
-    info!("Starting server on {host_addr}");
+    info!("Starting server v{} on {host_addr}", env!("CARGO_PKG_VERSION"));
     info!("Permitted hosts:");
     for host in &servers {
         info!("- {host}");

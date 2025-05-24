@@ -60,9 +60,9 @@ impl RelayServer {
 
                                 let client = Arc::new(client);
 
-                                self.clients
-                                    .lock()
-                                    .insert(*client.get_udp_peer().unwrap(), client.clone());
+                                if let Some(peer) = client.get_udp_peer() {
+                                    self.clients.lock().insert(*peer, client.clone());
+                                }
 
                                 tokio::spawn(async move {
                                     match RelayClient::run_client(&client).await {
@@ -84,7 +84,9 @@ impl RelayServer {
                                         }
                                     }
 
-                                    self.clients.lock().remove(client.get_udp_peer().unwrap());
+                                    if let Some(peer) = client.get_udp_peer() {
+                                        self.clients.lock().remove(peer);
+                                    }
                                 });
                             }
 
@@ -100,6 +102,14 @@ impl RelayServer {
 
                             Err(_) => {
                                 warn!("[{peer}] Timed out waiting for relay login, disconnecting");
+
+                                let _ = tokio::time::timeout(
+                                    Duration::from_secs(10),
+                                    client.send_relay_error(
+                                        "connection timed out, did not receive a link packet in 45 seconds",
+                                    ),
+                                )
+                                .await;
                             }
                         }
                     });
@@ -177,10 +187,19 @@ impl RelayServer {
         let notify = Arc::new(Notify::new());
         self.udp_awaiters.lock().insert(udp_id, notify.clone());
 
-        notify.notified().await; // wait for a udp connection to claim us
+        let use_udp = tokio::select! {
+            // wait for a udp connection to claim us
+            _ = notify.notified() => true,
 
-        let udp_peer;
-        {
+            // wait for the client to send a tcp packet and tell us they are tcp only
+            res = client.wait_for_skip_udp_link() => {
+                res?;
+
+                false
+            }
+        };
+
+        if use_udp {
             let mut queue = self.udp_accepted_queue.lock();
             let idx = queue.iter().position(|(id, _v)| *id == udp_id);
 
@@ -189,12 +208,15 @@ impl RelayServer {
                 return Err(RelayError::InternalError);
             }
 
-            (_, udp_peer) = queue.remove(idx.unwrap());
-        }
+            let (_, udp_peer) = queue.remove(idx.unwrap());
 
-        // we now have a udp ip
-        debug!("[{}] linked to UDP address: {}", client.get_peer_addr(), udp_peer);
-        client.set_udp_peer(Some(udp_peer));
+            // we now have a udp ip
+            debug!("[{}] linked to UDP address: {}", client.get_peer_addr(), udp_peer);
+            client.set_udp_peer(Some(udp_peer));
+        } else {
+            debug!("[{}] skipped UDP link!", client.get_peer_addr());
+            client.set_udp_peer(None);
+        }
 
         client.establish_upstream_connection().await.inspect_err(|e| {
             warn!(
